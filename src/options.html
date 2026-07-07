@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OneSearch — Options</title>
+  <style>
+    :root {
+      --bg: #12141c;
+      --panel: #1b1e2a;
+      --panel2: #22263466;
+      --border: rgba(255, 255, 255, 0.09);
+      --text: #e8eaf2;
+      --muted: #9aa0b4;
+      --accent: #8b7bf7;
+      --accent2: #d066f2;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      font-family: -apple-system, "Segoe UI", system-ui, Roboto, sans-serif;
+      background:
+        radial-gradient(1200px 500px at 80% -10%, rgba(139, 123, 247, 0.14), transparent),
+        radial-gradient(900px 400px at 0% 110%, rgba(208, 102, 242, 0.10), transparent),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 40px 20px 80px;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; }
+
+    header { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+    header svg { width: 40px; height: 40px; }
+    h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.3px; }
+    h1 span { background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .tagline { color: var(--muted); margin: 4px 0 28px 54px; font-size: 13.5px; }
+
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px 24px;
+      margin-bottom: 18px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+    }
+    h2 {
+      font-size: 13px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1.2px; color: var(--muted); margin-bottom: 16px;
+    }
+
+    .row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; padding: 10px 0;
+    }
+    .row + .row { border-top: 1px solid rgba(255, 255, 255, 0.05); }
+    .row .lbl { font-size: 14px; }
+    .row .sub { font-size: 12px; color: var(--muted); margin-top: 3px; max-width: 440px; }
+
+    .palette { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    input[type="color"] {
+      appearance: none; -webkit-appearance: none;
+      width: 44px; height: 44px; border: none; border-radius: 12px;
+      background: none; cursor: pointer; padding: 0;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; }
+    .swatch { text-align: center; font-size: 10px; color: var(--muted); }
+    .swatch div { margin-top: 4px; }
+
+    /* Toggle switch */
+    .switch { position: relative; width: 42px; height: 24px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .knob {
+      position: absolute; inset: 0; cursor: pointer; border-radius: 24px;
+      background: rgba(255, 255, 255, 0.12); transition: background 140ms;
+    }
+    .knob::before {
+      content: ""; position: absolute; width: 18px; height: 18px;
+      left: 3px; top: 3px; border-radius: 50%;
+      background: #fff; transition: transform 140ms;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+    .switch input:checked + .knob { background: linear-gradient(135deg, #6366f1, #a855f7); }
+    .switch input:checked + .knob::before { transform: translateX(18px); }
+
+    input[type="range"] { width: 190px; accent-color: var(--accent); }
+    input[type="number"] {
+      width: 92px; background: var(--panel2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 7px 10px; font-size: 13px;
+    }
+    .rangeval { font-size: 12px; color: var(--muted); min-width: 54px; text-align: right; }
+
+    .preview {
+      background: #fff; color: #222; border-radius: 12px;
+      padding: 16px 18px; font-size: 14px; line-height: 1.9;
+      font-family: Georgia, serif; margin-top: 14px;
+    }
+    .preview mark {
+      padding: 1px 3px; border-radius: 3px; color: #1a1a1a;
+    }
+    .preview mark.active { color: #fff; text-decoration: underline 2px; }
+
+    .actions { display: flex; gap: 12px; margin-top: 8px; }
+    button.reset {
+      appearance: none; cursor: pointer;
+      background: transparent; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 9px 16px; font-size: 13px;
+      transition: color 120ms, border-color 120ms;
+    }
+    button.reset:hover { color: #ff8f8f; border-color: rgba(255, 120, 120, 0.4); }
+
+    .savebanner {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translate(-50%, 80px);
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      color: #fff; font-size: 13px; font-weight: 600;
+      padding: 10px 22px; border-radius: 30px;
+      box-shadow: 0 8px 30px rgba(120, 80, 240, 0.5);
+      transition: transform 200ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+      pointer-events: none;
+    }
+    .savebanner.show { transform: translate(-50%, 0); }
+
+    kbd {
+      background: var(--panel2); border: 1px solid var(--border);
+      border-bottom-width: 2px; border-radius: 5px;
+      padding: 1px 6px; font-size: 11px; font-family: inherit;
+    }
+    .shortcuts { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; font-size: 13px; color: var(--muted); }
+    .shortcuts .k { white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#818cf8"/><stop offset="1" stop-color="#e879f9"/>
+        </linearGradient></defs>
+        <circle cx="10.5" cy="10.5" r="6.5"/><line x1="15.5" y1="15.5" x2="21" y2="21"/>
+      </svg>
+      <h1>One<span>Search</span></h1>
+    </header>
+    <p class="tagline">The find bar Firefox users remember, rebuilt for Chrome — and then some.</p>
+
+    <section>
+      <h2>Highlight colors</h2>
+      <div class="row">
+        <div>
+          <div class="lbl">Rainbow palette</div>
+          <div class="sub">Matches cycle through these five colors so neighbors never blur together.</div>
+        </div>
+      </div>
+      <div class="palette" id="palette"></div>
+      <div class="row">
+        <div>
+          <div class="lbl">Active match color</div>
+          <div class="sub">The current result — also used by the spotlight rings.</div>
+        </div>
+        <input type="color" id="activeColor">
+      </div>
+      <div class="row">
+        <div>
+          <div class="lbl">Rainbow mode</div>
+          <div class="sub">Off = every match uses the first palette color only.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="rainbow"><span class="knob"></span></label>
+      </div>
+      <div class="preview" id="preview">
+        The <mark data-c="0">quick</mark> brown fox <mark data-c="1">quick</mark>ly jumps over the lazy dog,
+        then <mark data-c="2">quick</mark>ens its pace — a <mark class="active" data-a>quick</mark> getaway,
+        <mark data-c="3">quick</mark> and <mark data-c="4">quick</mark>-witted.
+      </div>
+    </section>
+
+    <section>
+      <h2>Search defaults</h2>
+      <div class="row">
+        <div class="lbl">Match case (Aa)</div>
+        <label class="switch"><input type="checkbox" id="matchCase"><span class="knob"></span></label>
+      </div>
+      <div class="row">
+        <div class="lbl">Whole words only</div>
+        <label class="switch"><input type="checkbox" id="wholeWord"><span class="knob"></span></label>
+      </div>
+      <div class="row">
+        <div class="lbl">Regular expressions</div>
+        <label class="switch"><input type="checkbox" id="useRegex"><span class="knob"></span></label>
+      </div>
+      <div class="row">
+        <div>
+          <div class="lbl">Ignore accents &amp; diacritics</div>
+          <div class="sub">"resume" finds "résumé", "uber" finds "über".</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="ignoreDiacritics"><span class="knob"></span></label>
+      </div>
+      <div class="row">
+        <div>
+          <div class="lbl">Highlight all matches</div>
+          <div class="sub">The legendary Firefox "Highlight All" button, on by default.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="highlightAll"><span class="knob"></span></label>
+      </div>
+      <div class="row">
+        <div>
+          <div class="lbl">Remember last search</div>
+          <div class="sub">Reopening the bar restores your previous query, pre-selected.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="persistQuery"><span class="knob"></span></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Locating results</h2>
+      <div class="row">
+        <div>
+          <div class="lbl">Spotlight rings</div>
+          <div class="sub">Concentric rings sweep in from the edges of the screen and converge on the active match. Impossible to lose.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="spotlight"><span class="knob"></span></label>
+      </div>
+      <div class="row">
+        <div class="lbl">Spotlight speed</div>
+        <div>
+          <input type="range" id="spotlightDuration" min="300" max="1600" step="50">
+          <span class="rangeval" id="spotlightDurationVal"></span>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <div class="lbl">Scrollbar minimap</div>
+          <div class="sub">Colored ticks along the right edge show where every match lives. Click a tick to jump.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="minimap"><span class="knob"></span></label>
+      </div>
+      <div class="row">
+        <div>
+          <div class="lbl">Smooth scrolling</div>
+          <div class="sub">Glide between results instead of teleporting.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="smoothScroll"><span class="knob"></span></label>
+      </div>
+      <div class="row">
+        <div>
+          <div class="lbl">Match count on toolbar badge</div>
+          <div class="sub">Shows the number of results on the extension icon.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="badge"><span class="knob"></span></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Old-school quick find</h2>
+      <div class="row">
+        <div>
+          <div class="lbl">Type-ahead find (<kbd>/</kbd> and <kbd>'</kbd>)</div>
+          <div class="sub">Press <kbd>/</kbd> anywhere to quick-search, <kbd>'</kbd> to search links only — <kbd>Enter</kbd> follows the link. Auto-dismisses after 5s, just like Firefox circa 2004.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="quickFind"><span class="knob"></span></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Performance</h2>
+      <div class="row">
+        <div>
+          <div class="lbl">Maximum matches</div>
+          <div class="sub">Stops collecting after this many results on gigantic pages.</div>
+        </div>
+        <input type="number" id="maxMatches" min="100" max="100000" step="100">
+      </div>
+    </section>
+
+    <section>
+      <h2>Keyboard cheatsheet</h2>
+      <div class="shortcuts">
+        <span class="k"><kbd>Ctrl</kbd>+<kbd>F</kbd></span><span>Open OneSearch (replaces the native find)</span>
+        <span class="k"><kbd>Enter</kbd> / <kbd>Shift</kbd>+<kbd>Enter</kbd></span><span>Next / previous match</span>
+        <span class="k"><kbd>F3</kbd> / <kbd>Ctrl</kbd>+<kbd>G</kbd></span><span>Find again (even with the bar closed)</span>
+        <span class="k"><kbd>/</kbd> &nbsp;·&nbsp; <kbd>'</kbd></span><span>Quick find · quick find in links only</span>
+        <span class="k"><kbd>Alt</kbd>+<kbd>C</kbd>/<kbd>W</kbd>/<kbd>R</kbd>/<kbd>D</kbd>/<kbd>A</kbd></span><span>Toggle case / word / regex / diacritics / highlight-all</span>
+        <span class="k"><kbd>Esc</kbd></span><span>Close</span>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button class="reset" id="reset">Reset everything to defaults</button>
+    </div>
+  </div>
+
+  <div class="savebanner" id="saved">✓ Saved</div>
+  <script src="options.js"></script>
+</body>
+</html>
