@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "OneSearch — Advanced Find in Page",
+  "version": "1.0.0",
+  "description": "A supercharged Ctrl+F. Rainbow highlights, spotlight locator, scrollbar minimap, quick-find (/ and '), regex, whole-word, diacritics-insensitive search — old-school Firefox soul, modern polish.",
+  "permissions": ["storage"],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_title": "OneSearch — open find bar (Ctrl+F)"
+  },
+  "options_page": "src/options.html",
+  "commands": {
+    "toggle-search": {
+      "suggested_key": { "default": "Ctrl+Shift+F" },
+      "description": "Toggle the OneSearch find bar"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
