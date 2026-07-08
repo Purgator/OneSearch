@@ -123,24 +123,21 @@
   // --------------------------------------------------------------------------
 
   const COMBINING = /[̀-ͯ]/g;
+  const NON_ASCII = /[^\x00-\x7f]/;
 
   function foldString(text) {
-    let out = "";
-    for (const ch of text) {
-      let f = ch;
-      if (settings.ignoreDiacritics) {
-        f = ch.normalize("NFD").replace(COMBINING, "");
-        if (f === "") continue; // standalone combining mark
-      }
-      if (!state.matchCase) f = f.toLowerCase();
-      out += f;
-    }
-    return out;
+    return foldWithMap(text).folded;
   }
 
   // Returns { folded, map } where map[i] = UTF-16 offset in `text` of the
-  // original character that produced folded char i.
+  // original character that produced folded char i. A null map means folded
+  // offsets equal original offsets (identity), which holds for pure-ASCII
+  // text — the overwhelmingly common case — where a native toLowerCase()
+  // replaces the per-character folding loop.
   function foldWithMap(text) {
+    if (!NON_ASCII.test(text)) {
+      return { folded: state.matchCase ? text : text.toLowerCase(), map: null };
+    }
     let folded = "";
     const map = [];
     let idx = 0;
@@ -155,6 +152,33 @@
       idx += ch.length;
     }
     return { folded, map };
+  }
+
+  // Folding a node is by far the hottest work in a search, and node text
+  // rarely changes between keystrokes — cache per node, keyed on the data
+  // and the fold-relevant flags.
+  const foldCache = new WeakMap();
+
+  function foldedForNode(node) {
+    const cached = foldCache.get(node);
+    if (
+      cached &&
+      cached.data === node.data &&
+      cached.matchCase === state.matchCase &&
+      cached.dia === settings.ignoreDiacritics
+    ) {
+      return cached;
+    }
+    const { folded, map } = foldWithMap(node.data);
+    const entry = {
+      data: node.data,
+      matchCase: state.matchCase,
+      dia: settings.ignoreDiacritics,
+      folded,
+      map
+    };
+    foldCache.set(node, entry);
+    return entry;
   }
 
   function charLenAt(text, i) {
@@ -249,9 +273,9 @@
       if (matcher.raw) {
         haystack = text;
       } else {
-        const fm = foldWithMap(text);
+        const fm = foldedForNode(node);
         haystack = fm.folded;
-        map = fm.map;
+        map = fm.map; // null = identity offsets (ASCII fast path)
       }
 
       matcher.re.lastIndex = 0;
@@ -528,7 +552,7 @@
       if (nextActive < 0) nextActive = firstIndexInView();
     }
     setActive(nextActive, { scroll: !prev });
-    renderMinimap();
+    scheduleMinimap();
     updateBarState();
   }
 
@@ -538,16 +562,33 @@
   }
 
   function firstIndexInView() {
-    const limit = Math.min(state.matches.length, 5000);
-    for (let i = 0; i < limit; i++) {
-      const r = state.matches[i].range.getBoundingClientRect();
-      if (r.bottom >= 0 && r.top < window.innerHeight) return i;
+    const n = state.matches.length;
+    if (n === 0) return 0;
+    const rectOf = (i) => state.matches[i].range.getBoundingClientRect();
+
+    if (n <= 300) {
+      // Small result sets: exact linear scan.
+      for (let i = 0; i < n; i++) {
+        const r = rectOf(i);
+        if (r.bottom >= 0 && r.top < window.innerHeight) return i;
+      }
+      for (let i = 0; i < n; i++) {
+        if (rectOf(i).top >= 0) return i;
+      }
+      return 0;
     }
-    for (let i = 0; i < limit; i++) {
-      const r = state.matches[i].range.getBoundingClientRect();
-      if (r.top >= 0) return i;
+
+    // Large result sets (a one-letter query can hit thousands): rect queries
+    // are the bottleneck, so binary-search for the first match at or below
+    // the top of the viewport — document order tracks vertical order closely
+    // enough. O(log n) rects instead of O(n).
+    let lo = 0, hi = n - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (rectOf(mid).bottom < 0) lo = mid + 1;
+      else hi = mid;
     }
-    return 0;
+    return rectOf(lo).bottom >= 0 ? lo : 0;
   }
 
   function setActive(index, { scroll = true } = {}) {
@@ -715,6 +756,35 @@
 
   const MAX_TICKS = 500;
   let tickIndexMap = [];
+  let minimapJob = 0;
+
+  // Minimap rendering costs one rect query per tick; keep it off the
+  // keystroke's critical path by deferring to idle time (coalesced).
+  function scheduleMinimap() {
+    cancelMinimapJob();
+    if (typeof requestIdleCallback === "function") {
+      minimapJob = requestIdleCallback(() => { minimapJob = 0; renderMinimap(); }, { timeout: 250 });
+    } else {
+      minimapJob = setTimeout(() => { minimapJob = 0; renderMinimap(); }, 50);
+    }
+  }
+
+  function cancelMinimapJob() {
+    if (!minimapJob) return;
+    if (typeof cancelIdleCallback === "function") cancelIdleCallback(minimapJob);
+    else clearTimeout(minimapJob);
+    minimapJob = 0;
+  }
+
+  // One delegated listener instead of a listener per tick.
+  minimap.addEventListener("mousedown", (e) => {
+    const tick = e.target.closest(".tick");
+    if (!tick) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setActive(+tick.dataset.i);
+    bumpQuickTimer();
+  });
 
   function renderMinimap() {
     const old = minimap.querySelectorAll(".tick");
@@ -749,12 +819,6 @@
       tick.style.top = `calc(${Math.min(99.5, y)}% - 1px)`;
       tick.dataset.i = String(i);
       tick.title = `Match ${i + 1} of ${n}`;
-      tick.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setActive(i);
-        bumpQuickTimer();
-      });
       frag.appendChild(tick);
       tickIndexMap.push(i);
     }
@@ -817,6 +881,7 @@
     state.matches = [];
     state.active = -1;
     minimap.classList.remove("show");
+    cancelMinimapJob();
     spotlayer.textContent = "";
     cancelAnimationFrame(spotAnim);
     stopObserver();
@@ -1017,7 +1082,7 @@
   window.addEventListener("resize", () => {
     if (!state.open) return;
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(renderMinimap, 250);
+    resizeTimer = setTimeout(scheduleMinimap, 250);
   });
 
   // --------------------------------------------------------------------------
