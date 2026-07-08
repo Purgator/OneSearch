@@ -37,8 +37,13 @@
     highlightAll: true,
     spotlight: true,
     spotlightDuration: 750,
+    spotlightRings: 3,
+    spotlightThickness: 3,
+    spotlightStagger: 90,
+    spotlightColor: "",
     minimap: true,
     quickFind: true,
+    typeAheadFind: false,
     badge: true,
     smoothScroll: true,
     persistQuery: true,
@@ -633,13 +638,17 @@
     spotlayer.textContent = "";
 
     const D = Math.max(250, settings.spotlightDuration | 0);
-    const color = settings.activeColor;
+    const color = settings.spotlightColor || settings.activeColor;
+    const ringCount = Math.min(6, Math.max(1, settings.spotlightRings | 0 || 3));
+    const stagger = Math.min(400, Math.max(0, settings.spotlightStagger | 0));
+    const thickness = Math.min(10, Math.max(1, settings.spotlightThickness | 0 || 3));
     const rings = [];
-    for (let j = 0; j < 3; j++) {
+    for (let j = 0; j < ringCount; j++) {
       const r = document.createElement("div");
       r.className = "ring";
       r.style.color = color;
       r.style.borderColor = color;
+      r.style.borderWidth = thickness + "px";
       spotlayer.appendChild(r);
       rings.push(r);
     }
@@ -650,6 +659,9 @@
     spotlayer.appendChild(flash);
 
     const diag = Math.hypot(window.innerWidth, window.innerHeight);
+    // Each ring travels for `travel` ms, launching `stagger` ms apart; the
+    // last ring lands at ~D so the configured duration stays truthful.
+    const travel = Math.max(150, D - stagger * (ringCount - 1));
     const t0 = performance.now();
     const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
@@ -663,7 +675,7 @@
       let alive = false;
 
       rings.forEach((r, j) => {
-        const local = (t - j * 90) / (D - 90 * 2);
+        const local = (t - j * stagger) / travel;
         if (local < 0) { r.style.opacity = "0"; alive = true; return; }
         if (local >= 1) { r.style.opacity = "0"; return; }
         alive = true;
@@ -784,7 +796,12 @@
       state.query = inputEl.value;
     }
     inputEl.focus();
-    inputEl.select();
+    if (seed) {
+      // Seeded from type-ahead: caret at the end so typing keeps appending.
+      inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+    } else {
+      inputEl.select();
+    }
     if (state.query) runSearch();
     else updateBarState();
     startObserver();
@@ -953,6 +970,20 @@
       inputEl.value = "";
       state.query = "";
       openBar({ quick: true, linksOnly: e.key === "'" });
+      return;
+    }
+
+    // Firefox's classic "Search for text when you start typing": any printable
+    // key outside a form field starts a quick find seeded with that character.
+    if (
+      settings.typeAheadFind && !state.open &&
+      !e.ctrlKey && !e.metaKey && !e.altKey &&
+      e.key.length === 1 && e.key !== " " &&
+      !isEditable(target)
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      openBar({ quick: true, seed: e.key });
     }
   }, true);
 

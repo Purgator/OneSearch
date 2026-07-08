@@ -21,7 +21,7 @@ Chrome's find bar hasn't changed in 15 years. Firefox in the good old days had *
 
 ### Finding your way
 - **Rainbow highlights** — matches cycle through 5 configurable colors so adjacent results never blur together
-- **Spotlight rings** 🎯 — when you jump to a result, concentric rings sweep in from the edges of the screen and converge on the match. You physically cannot lose it.
+- **Spotlight rings** 🎯 — when you jump to a result, concentric rings sweep in from the edges of the screen and converge on the match. You physically cannot lose it. Fully tunable: speed, ring count, thickness, launch stagger, custom color — with a live preview in the options page.
 - **Scrollbar minimap** — colored ticks along the right edge show where every match lives in the document; click a tick to jump straight there
 - **`3 / 127` live counter** + match count on the toolbar badge
 - "Reached end — wrapped to top ↺" notice, like the old days
@@ -30,6 +30,7 @@ Chrome's find bar hasn't changed in 15 years. Firefox in the good old days had *
 ### Old-school quick find
 - Press **`/`** anywhere → quick find (auto-dismisses after 5 s of inactivity, Firefox-2004 style)
 - Press **`'`** → quick find **links only**; **Enter follows the link**
+- **Search when you start typing** (off by default) — the classic Firefox accessibility option: any printable key outside a form field starts a quick find instantly
 - **F3 / Shift+F3 / Ctrl+G** — find again, even with the bar closed
 
 ### Ergonomics
