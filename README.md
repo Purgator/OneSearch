@@ -39,15 +39,25 @@ Chrome's find bar hasn't changed in 15 years. Firefox in the good old days had *
 - Remembers your last search, pre-selected on reopen
 - Everything configurable in a polished options page; settings sync across your Chrome profiles
 
-## Install (unpacked)
+## How to install (no technical skills needed)
 
-1. Clone this repo
-2. Open `chrome://extensions`
-3. Enable **Developer mode** (top right)
-4. Click **Load unpacked** and select the repo folder
-5. Hit **Ctrl+F** on any page
+OneSearch isn't on the Chrome Web Store (yet), but installing it by hand takes about two minutes:
 
-> Requires Chrome 105+ (CSS Custom Highlight API).
+1. **Download it** — go to the [latest release](https://github.com/Purgator/OneSearch/releases/latest) and click **`OneSearch-v1.0.0.zip`** under *Assets*.
+2. **Unzip it** — find the downloaded file (usually in your *Downloads* folder), right-click it and choose **Extract All…** (Windows) or double-click it (Mac). You now have a folder called `OneSearch`.
+   > ⚠️ Move that folder somewhere permanent (like your Documents) — Chrome loads the extension *from* this folder, so don't delete it afterwards.
+3. **Open Chrome's extensions page** — type `chrome://extensions` in the address bar and press Enter.
+4. **Turn on Developer mode** — it's a small switch in the top-right corner of that page.
+5. **Load the extension** — click the **Load unpacked** button (top-left), and select the `OneSearch` folder you extracted (the one containing `manifest.json`).
+6. **Done!** Open any web page and press **Ctrl+F**. Enjoy the rainbow. 🌈
+
+To change colors and options later: right-click the OneSearch icon in the toolbar → **Options** (or click the ⚙ in the search bar itself).
+
+> Chrome may show "unpacked extension" warnings — that's normal for extensions installed outside the Web Store. Requires Chrome 105 or newer (any Chrome from late 2022 onwards).
+
+### Developer install
+
+Clone the repo and load the folder directly via `chrome://extensions` → Developer mode → **Load unpacked**.
 
 ## Keyboard reference
 
