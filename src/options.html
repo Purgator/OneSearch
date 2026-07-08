@@ -227,6 +227,47 @@
         </div>
       </div>
       <div class="row">
+        <div class="lbl">Number of rings</div>
+        <div>
+          <input type="range" id="spotlightRings" min="1" max="6" step="1">
+          <span class="rangeval" id="spotlightRingsVal"></span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="lbl">Ring thickness</div>
+        <div>
+          <input type="range" id="spotlightThickness" min="1" max="10" step="1">
+          <span class="rangeval" id="spotlightThicknessVal"></span>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <div class="lbl">Ring stagger</div>
+          <div class="sub">Delay between each ring launching. 0 = all rings sweep in together.</div>
+        </div>
+        <div>
+          <input type="range" id="spotlightStagger" min="0" max="300" step="10">
+          <span class="rangeval" id="spotlightStaggerVal"></span>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <div class="lbl">Custom ring color</div>
+          <div class="sub">Off = rings use the active match color.</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <input type="color" id="spotlightColorPick" style="width:34px;height:34px">
+          <label class="switch"><input type="checkbox" id="spotlightColorOn"><span class="knob"></span></label>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <div class="lbl">Try it: <mark id="spot-target" style="padding:2px 6px;border-radius:4px">this match</mark></div>
+          <div class="sub">Plays the spotlight with your current settings.</div>
+        </div>
+        <button class="reset" id="spot-play" style="color:var(--text)">▶ Preview</button>
+      </div>
+      <div class="row">
         <div>
           <div class="lbl">Scrollbar minimap</div>
           <div class="sub">Colored ticks along the right edge show where every match lives. Click a tick to jump.</div>
@@ -257,6 +298,13 @@
           <div class="sub">Press <kbd>/</kbd> anywhere to quick-search, <kbd>'</kbd> to search links only — <kbd>Enter</kbd> follows the link. Auto-dismisses after 5s, just like Firefox circa 2004.</div>
         </div>
         <label class="switch"><input type="checkbox" id="quickFind"><span class="knob"></span></label>
+      </div>
+      <div class="row">
+        <div>
+          <div class="lbl">Search when you start typing</div>
+          <div class="sub">The classic Firefox accessibility option: typing any character outside a form field starts a quick find immediately — no Ctrl+F needed.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="typeAheadFind"><span class="knob"></span></label>
       </div>
     </section>
 
