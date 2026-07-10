@@ -3,6 +3,36 @@
 // OneSearch options page — loads settings from chrome.storage.sync,
 // saves on every change, live-updates the highlight preview.
 
+const DEFAULT_KEYMAP = {
+  openBar: ["Ctrl+F", "Meta+F"],
+  findNext: ["F3", "Ctrl+G"],
+  findPrev: ["Shift+F3", "Ctrl+Shift+G"],
+  quickFind: ["/"],
+  quickFindLinks: ["'"],
+  openLinkNewTab: ["Ctrl+Enter", "Meta+Enter"],
+  closeBar: ["Escape"],
+  toggleCase: ["Alt+C"],
+  toggleWord: ["Alt+W"],
+  toggleRegex: ["Alt+R"],
+  toggleDiacritics: ["Alt+D"],
+  toggleHighlightAll: ["Alt+A"]
+};
+
+const KEY_ACTIONS = [
+  ["openBar", "Open the find bar (replaces native Ctrl+F)"],
+  ["findNext", "Find next"],
+  ["findPrev", "Find previous"],
+  ["quickFind", "Quick find (type-ahead)"],
+  ["quickFindLinks", "Quick find in links only"],
+  ["openLinkNewTab", "Open matched link in a new tab"],
+  ["closeBar", "Close the bar"],
+  ["toggleCase", "Toggle match case"],
+  ["toggleWord", "Toggle whole words"],
+  ["toggleRegex", "Toggle regular expression"],
+  ["toggleDiacritics", "Toggle accents / diacritics"],
+  ["toggleHighlightAll", "Toggle highlight all"]
+];
+
 const DEFAULTS = {
   colors: ["#ffd54a", "#7ef29a", "#7ecbff", "#ff9df2", "#ffb27e"],
   activeColor: "#ff4d2e",
@@ -24,7 +54,8 @@ const DEFAULTS = {
   badge: true,
   smoothScroll: true,
   persistQuery: true,
-  maxMatches: 10000
+  maxMatches: 10000,
+  keymap: DEFAULT_KEYMAP
 };
 
 const BOOL_KEYS = [
@@ -236,6 +267,12 @@ function bind() {
     save();
   });
 
+  $("resetKeys").addEventListener("click", () => {
+    settings.keymap = structuredClone(DEFAULT_KEYMAP);
+    save();
+    renderKeymap();
+  });
+
   $("reset").addEventListener("click", () => {
     settings = structuredClone(DEFAULTS);
     chrome.storage.sync.clear(() => {
@@ -244,12 +281,101 @@ function bind() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Keybinding editor — click a slot, press the combo. Same combo format as
+// content.js: "Ctrl+Shift+F".
+// ---------------------------------------------------------------------------
+
+function comboOf(e) {
+  const parts = [];
+  if (e.ctrlKey) parts.push("Ctrl");
+  if (e.altKey) parts.push("Alt");
+  if (e.shiftKey) parts.push("Shift");
+  if (e.metaKey) parts.push("Meta");
+  let k = e.key;
+  if (k === " ") k = "Space";
+  else if (k.length === 1) k = k.toUpperCase();
+  parts.push(k);
+  return parts.join("+");
+}
+
+let recording = null; // { action, slot, btn }
+
+function stopRecording() {
+  if (!recording) return;
+  recording.btn.classList.remove("recording");
+  recording = null;
+  renderKeymap();
+}
+
+function renderKeymap() {
+  const wrap = $("keymap");
+  wrap.textContent = "";
+  for (const [action, label] of KEY_ACTIONS) {
+    const row = document.createElement("div");
+    row.className = "keyrow";
+    const lbl = document.createElement("span");
+    lbl.className = "klbl";
+    lbl.textContent = label;
+    row.appendChild(lbl);
+    for (const slot of [0, 1]) {
+      const btn = document.createElement("button");
+      btn.className = "keybtn";
+      const combo = settings.keymap[action][slot];
+      btn.textContent = combo || "—";
+      if (!combo) btn.classList.add("empty");
+      btn.title = combo ? "Click to rebind" : "Click to add a binding";
+      btn.addEventListener("click", () => {
+        stopRecording();
+        recording = { action, slot, btn };
+        btn.classList.add("recording");
+        btn.classList.remove("empty");
+        btn.textContent = "Press keys…";
+      });
+      row.appendChild(btn);
+    }
+    wrap.appendChild(row);
+  }
+}
+
+window.addEventListener("keydown", (e) => {
+  if (!recording) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (["Control", "Alt", "Shift", "Meta"].includes(e.key)) return; // wait for the full combo
+  if (e.key === "Escape") { stopRecording(); return; }
+
+  const { action, slot } = recording;
+  const arr = [...settings.keymap[action]];
+  if (e.key === "Backspace" || e.key === "Delete") {
+    arr.splice(slot, 1);
+  } else {
+    arr[slot] = comboOf(e);
+  }
+  // Compact empty slots and drop duplicates within the action.
+  settings.keymap[action] = [...new Set(arr.filter(Boolean))].slice(0, 2);
+  save();
+  stopRecording();
+}, true);
+
 chrome.storage.sync.get(null, (stored) => {
   settings = { ...DEFAULTS, ...(stored || {}) };
   if (!Array.isArray(settings.colors) || settings.colors.length !== DEFAULTS.colors.length) {
     settings.colors = [...DEFAULTS.colors];
   }
+  // Per-action merge so older stored settings never leave an action undefined.
+  const km = {};
+  const storedKm = stored && stored.keymap;
+  for (const action of Object.keys(DEFAULT_KEYMAP)) {
+    const v = storedKm && storedKm[action];
+    km[action] = Array.isArray(v)
+      ? v.filter((c) => typeof c === "string" && c)
+      : [...DEFAULT_KEYMAP[action]];
+  }
+  settings.keymap = km;
+
   renderPalette();
   renderPreview();
+  renderKeymap();
   bind();
 });
