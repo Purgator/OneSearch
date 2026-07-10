@@ -471,7 +471,7 @@
     <input class="q" type="text" placeholder="Find in page…" spellcheck="false" autocomplete="off">
     <span class="chip quick">QUICK</span>
     <span class="chip links">LINKS</span>
-    <span class="kbd-hint">Enter ↵ opens link</span>
+    <span class="kbd-hint">Enter opens · Ctrl+Enter new tab</span>
     <span class="count">—</span>
     <span class="sep"></span>
     <button class="tgl t-case" title="Match case (Alt+C)">Aa</button>
@@ -931,14 +931,44 @@
     bumpQuickTimer();
   });
 
+  // The link containing the active match, if any.
+  function activeLink() {
+    if (state.active < 0) return null;
+    const m = state.matches[state.active];
+    const p = m.node.parentElement;
+    return p ? p.closest("a[href]") : null;
+  }
+
+  function openLinkInNewTab(link, foreground) {
+    if (!/^https?:/i.test(link.href)) {
+      window.open(link.href, "_blank"); // mailto:, ftp:, ... — let the browser route it
+      return;
+    }
+    try {
+      chrome.runtime.sendMessage({ type: "os-open-tab", url: link.href, active: !!foreground });
+    } catch {
+      window.open(link.href, "_blank"); // extension context gone; degrade gracefully
+    }
+  }
+
   inputEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      if (state.linksOnly && state.active >= 0 && !e.shiftKey) {
+      const link = activeLink();
+      // Ctrl+Enter: open the active match's link in a new tab (Ctrl+Shift+Enter
+      // foregrounds it). Background tabs keep the bar open, Ctrl+click style,
+      // so you can keep walking matches and harvesting links.
+      if (link && (e.ctrlKey || e.metaKey)) {
+        openLinkInNewTab(link, e.shiftKey);
+        if (!e.shiftKey) toast("↗ Opened in a new tab");
+        bumpQuickTimer();
+        return;
+      }
+      if (state.linksOnly && link && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
         // Classic ' quick-find: Enter follows the focused link.
-        const m = state.matches[state.active];
-        const a = m.node.parentElement && m.node.parentElement.closest("a[href]");
-        if (a) { closeBar(); a.click(); return; }
+        closeBar();
+        link.click();
+        return;
       }
       move(e.shiftKey ? -1 : 1);
     } else if (e.key === "Escape") {
