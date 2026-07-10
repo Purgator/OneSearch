@@ -41,7 +41,9 @@ Chrome's find bar hasn't changed in 15 years. Firefox in the good old days had *
 
 ## How to install (no technical skills needed)
 
-OneSearch isn't on the Chrome Web Store (yet), but installing it by hand takes about two minutes:
+OneSearch isn't on the extension stores (yet), but installing it by hand takes about two minutes.
+
+### Chrome / Edge / Brave
 
 1. **Download it** — go to the [latest release](https://github.com/Purgator/OneSearch/releases/latest) and click the **`OneSearch-v*.zip`** file under *Assets*.
 2. **Unzip it** — find the downloaded file (usually in your *Downloads* folder), right-click it and choose **Extract All…** (Windows) or double-click it (Mac). You now have a folder called `OneSearch`.
@@ -55,9 +57,20 @@ To change colors and options later: right-click the OneSearch icon in the toolba
 
 > Chrome may show "unpacked extension" warnings — that's normal for extensions installed outside the Web Store. Requires Chrome 105 or newer (any Chrome from late 2022 onwards).
 
+### Firefox
+
+Requires Firefox 132 or newer. Download and unzip the release as above, then:
+
+1. Type `about:debugging#/runtime/this-firefox` in the address bar
+2. Click **Load Temporary Add-on…** and select the **`manifest.json`** file inside the `OneSearch` folder
+3. **Grant site access** — this is the step everyone misses: Firefox doesn't let extensions read pages until you say so. Click the OneSearch icon in the toolbar and press **"Grant access to all websites"** in the orange banner. (Alternative: `about:addons` → OneSearch → *Permissions* tab → enable *Access your data for all websites*.)
+4. Reload your open tabs once, then press **Ctrl+F** on any page
+
+> ⚠️ Temporary add-ons are removed when Firefox restarts — you'll need to load it again. A permanent install requires the extension to be signed by Mozilla (AMO); that's on the roadmap.
+
 ### Developer install
 
-Clone the repo and load the folder directly via `chrome://extensions` → Developer mode → **Load unpacked**.
+Clone the repo and load the folder directly: `chrome://extensions` → Developer mode → **Load unpacked** (Chrome), or `about:debugging` → **Load Temporary Add-on** (Firefox).
 
 ## Keyboard reference
 
@@ -77,9 +90,10 @@ These are the defaults — **every shortcut below is rebindable** in Options →
 ## Project layout
 
 ```
-manifest.json        MV3 manifest
+manifest.json        Cross-browser MV3 manifest (Chrome service worker + Firefox event page)
 src/content.js       Find bar UI, search engine, highlights, spotlight, minimap
 src/background.js    Command relay + toolbar badge
+src/popup.html/js    Toolbar popup — quick actions + Firefox permission banner
 src/options.html/js  Options page
 icons/               Generated icons
 tools/make-icons.ps1 Icon generator (PowerShell / System.Drawing)
@@ -87,7 +101,8 @@ tools/make-icons.ps1 Icon generator (PowerShell / System.Drawing)
 
 ## Notes
 
-- Content scripts can't run on `chrome://` pages, the Web Store, or the built-in PDF viewer — the native find bar still works there.
+- Content scripts can't run on browser pages (`chrome://`, `about:`), extension stores, or the built-in PDF viewer — the native find bar still works there.
+- Works on Chrome 105+ **and Firefox 132+** (both need the CSS Custom Highlight API). On Firefox, remember to grant site access via the toolbar popup — Firefox treats host permissions as optional and won't inject the extension until you do.
 - Plays nice with keyboard-driven extensions (Vimium, Surfingkeys…): the find bar uses an open shadow root so they can detect that you're typing in an input and switch to insert mode instead of firing shortcuts. Keys typed in the bar are also stopped from reaching page-level hotkey handlers.
 
 ## License
