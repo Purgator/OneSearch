@@ -311,7 +311,13 @@
   const hostEl = document.createElement("div");
   hostEl.id = "onesearch-host";
   hostEl.style.cssText = "all:initial;position:fixed;z-index:2147483647;top:0;left:0;width:0;height:0;";
-  const root = hostEl.attachShadow({ mode: "closed" });
+  // The shadow root must be OPEN: keyboard-driven extensions (Vimium,
+  // Surfingkeys...) decide whether the user is typing by resolving the real
+  // focused element via shadowRoot.activeElement / event.composedPath(). A
+  // closed root retargets everything to this bare <div>, so they'd treat
+  // keystrokes inside our find bar as page shortcuts. Style isolation is
+  // unaffected — open vs closed only changes JS visibility.
+  const root = hostEl.attachShadow({ mode: "open" });
 
   const uiSheet = new CSSStyleSheet();
   uiSheet.replaceSync(`
@@ -908,6 +914,16 @@
   // --------------------------------------------------------------------------
   // Events
   // --------------------------------------------------------------------------
+
+  // Keys typed anywhere in the bar must not leak to page hotkey handlers
+  // (GitHub/Gmail-style shortcuts listen in the bubble phase on document or
+  // window). Stopping here — after our own inner handlers have run — keeps
+  // the event inside the bar. Capture-phase extension listeners like Vimium
+  // have already run at this point; they stand down because the open shadow
+  // root lets them see our focused <input> (see attachShadow above).
+  for (const type of ["keydown", "keyup", "keypress"]) {
+    bar.addEventListener(type, (e) => e.stopPropagation());
+  }
 
   inputEl.addEventListener("input", () => {
     state.query = inputEl.value;
