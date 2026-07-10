@@ -29,7 +29,7 @@ Chrome's find bar hasn't changed in 15 years. Firefox in the good old days had *
 
 ### Old-school quick find
 - Press **`/`** anywhere → quick find (auto-dismisses after 5 s of inactivity, Firefox-2004 style)
-- Press **`'`** → quick find **links only**; **Enter follows the link**
+- Press **`'`** → quick find **links only**; **Enter follows the link**, **Ctrl+Enter opens it in a new background tab** (bar stays open so you can keep harvesting links), **Ctrl+Shift+Enter** switches to the new tab
 - **Search when you start typing** (off by default) — the classic Firefox accessibility option: any printable key outside a form field starts a quick find instantly
 - **F3 / Shift+F3 / Ctrl+G** — find again, even with the bar closed
 
@@ -68,6 +68,7 @@ Clone the repo and load the folder directly via `chrome://extensions` → Develo
 | `F3` / `Shift+F3` / `Ctrl+G` | Find again (works with bar closed) |
 | `/` | Quick find (auto-dismiss) |
 | `'` | Quick find in links only — `Enter` opens the link |
+| `Ctrl+Enter` | Open the matched link in a new background tab (`+Shift` to switch to it) |
 | `Alt+C` `Alt+W` `Alt+R` `Alt+D` `Alt+A` | Case / Word / Regex / Diacritics / Highlight-all |
 | `Esc` | Close |
 
