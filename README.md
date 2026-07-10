@@ -85,4 +85,5 @@ tools/make-icons.ps1 Icon generator (PowerShell / System.Drawing)
 ## Notes
 
 - Content scripts can't run on `chrome://` pages, the Web Store, or the built-in PDF viewer — the native find bar still works there.
+- Plays nice with keyboard-driven extensions (Vimium, Surfingkeys…): the find bar uses an open shadow root so they can detect that you're typing in an input and switch to insert mode instead of firing shortcuts. Keys typed in the bar are also stopped from reaching page-level hotkey handlers.
 - Highlights are pure paint (Custom Highlight API): copy/paste, selection and page scripts are completely unaffected.
