@@ -43,7 +43,7 @@ Chrome's find bar hasn't changed in 15 years. Firefox in the good old days had *
 
 OneSearch isn't on the Chrome Web Store (yet), but installing it by hand takes about two minutes:
 
-1. **Download it** — go to the [latest release](https://github.com/Purgator/OneSearch/releases/latest) and click **`OneSearch-v1.0.0.zip`** under *Assets*.
+1. **Download it** — go to the [latest release](https://github.com/Purgator/OneSearch/releases/latest) and click the **`OneSearch-v*.zip`** file under *Assets*.
 2. **Unzip it** — find the downloaded file (usually in your *Downloads* folder), right-click it and choose **Extract All…** (Windows) or double-click it (Mac). You now have a folder called `OneSearch`.
    > ⚠️ Move that folder somewhere permanent (like your Documents) — Chrome loads the extension *from* this folder, so don't delete it afterwards.
 3. **Open Chrome's extensions page** — type `chrome://extensions` in the address bar and press Enter.
@@ -89,4 +89,8 @@ tools/make-icons.ps1 Icon generator (PowerShell / System.Drawing)
 
 - Content scripts can't run on `chrome://` pages, the Web Store, or the built-in PDF viewer — the native find bar still works there.
 - Plays nice with keyboard-driven extensions (Vimium, Surfingkeys…): the find bar uses an open shadow root so they can detect that you're typing in an input and switch to insert mode instead of firing shortcuts. Keys typed in the bar are also stopped from reaching page-level hotkey handlers.
+
+## License
+
+OneSearch is free software, released under the [GNU General Public License v3.0](LICENSE) (or any later version). You are free to use, study, modify and share it — derivative works must remain free under the same terms.
 - Highlights are pure paint (Custom Highlight API): copy/paste, selection and page scripts are completely unaffected.
