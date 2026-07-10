@@ -26,6 +26,19 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     return;
   }
 
+  // Ctrl+Enter on a link match: open like a real Ctrl+click — right next to
+  // the current tab, with opener wired up so closing it returns you here.
+  if (msg.type === "os-open-tab" && sender.tab && typeof msg.url === "string" &&
+      /^https?:/i.test(msg.url)) {
+    chrome.tabs.create({
+      url: msg.url,
+      active: !!msg.active,
+      index: sender.tab.index + 1,
+      openerTabId: sender.tab.id
+    });
+    return;
+  }
+
   if (msg.type === "os-badge" && sender.tab && sender.tab.id != null) {
     const tabId = sender.tab.id;
     const count = msg.count | 0;
