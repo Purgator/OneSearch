@@ -26,6 +26,24 @@
   // Settings
   // --------------------------------------------------------------------------
 
+  // Every in-page shortcut, rebindable from the options page. Each action
+  // holds up to two combos. Enter / Shift+Enter navigation is fixed, and
+  // Escape always closes as a safety hatch even if closeBar is rebound.
+  const DEFAULT_KEYMAP = {
+    openBar: ["Ctrl+F", "Meta+F"],
+    findNext: ["F3", "Ctrl+G"],
+    findPrev: ["Shift+F3", "Ctrl+Shift+G"],
+    quickFind: ["/"],
+    quickFindLinks: ["'"],
+    openLinkNewTab: ["Ctrl+Enter", "Meta+Enter"],
+    closeBar: ["Escape"],
+    toggleCase: ["Alt+C"],
+    toggleWord: ["Alt+W"],
+    toggleRegex: ["Alt+R"],
+    toggleDiacritics: ["Alt+D"],
+    toggleHighlightAll: ["Alt+A"]
+  };
+
   const DEFAULTS = {
     colors: ["#ffd54a", "#7ef29a", "#7ecbff", "#ff9df2", "#ffb27e"],
     activeColor: "#ff4d2e",
@@ -47,7 +65,8 @@
     badge: true,
     smoothScroll: true,
     persistQuery: true,
-    maxMatches: 10000
+    maxMatches: 10000,
+    keymap: DEFAULT_KEYMAP
   };
 
   let settings = { ...DEFAULTS };
@@ -57,6 +76,17 @@
     if (!Array.isArray(settings.colors) || settings.colors.length === 0) {
       settings.colors = [...DEFAULTS.colors];
     }
+    // Merge the keymap per action so a partial/older stored keymap never
+    // leaves an action undefined.
+    const km = {};
+    const storedKm = stored && stored.keymap;
+    for (const action of Object.keys(DEFAULT_KEYMAP)) {
+      const v = storedKm && storedKm[action];
+      km[action] = Array.isArray(v)
+        ? v.filter((c) => typeof c === "string" && c)
+        : [...DEFAULT_KEYMAP[action]];
+    }
+    settings.keymap = km;
   }
 
   // --------------------------------------------------------------------------
@@ -198,6 +228,21 @@
   }
 
   const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // Normalizes a keyboard event to a combo string like "Ctrl+Shift+F" —
+  // the format stored in settings.keymap (options page uses the same one).
+  function comboOf(e) {
+    const parts = [];
+    if (e.ctrlKey) parts.push("Ctrl");
+    if (e.altKey) parts.push("Alt");
+    if (e.shiftKey) parts.push("Shift");
+    if (e.metaKey) parts.push("Meta");
+    let k = e.key;
+    if (k === " ") k = "Space";
+    else if (k.length === 1) k = k.toUpperCase();
+    parts.push(k);
+    return parts.join("+");
+  }
 
   // --------------------------------------------------------------------------
   // Matcher
@@ -519,12 +564,22 @@
   state.useRegex = DEFAULTS.useRegex;
   state.highlightAllOn = DEFAULTS.highlightAll;
 
+  function bindingLabel(action) {
+    const b = settings.keymap && settings.keymap[action];
+    return b && b.length ? b.join(" or ") : "unbound";
+  }
+
   function syncToggleUI() {
     toggles.matchCase.classList.toggle("on", state.matchCase);
     toggles.wholeWord.classList.toggle("on", state.wholeWord);
     toggles.useRegex.classList.toggle("on", state.useRegex);
     toggles.ignoreDiacritics.classList.toggle("on", settings.ignoreDiacritics);
     toggles.highlightAll.classList.toggle("on", state.highlightAllOn);
+    toggles.matchCase.title = `Match case (${bindingLabel("toggleCase")})`;
+    toggles.wholeWord.title = `Whole words (${bindingLabel("toggleWord")})`;
+    toggles.useRegex.title = `Regular expression (${bindingLabel("toggleRegex")})`;
+    toggles.ignoreDiacritics.title = `Ignore accents / diacritics (${bindingLabel("toggleDiacritics")})`;
+    toggles.highlightAll.title = `Highlight all (${bindingLabel("toggleHighlightAll")}) — the classic`;
   }
 
   // --------------------------------------------------------------------------
@@ -951,37 +1006,61 @@
     }
   }
 
+  const TOGGLE_ACTIONS = {
+    toggleCase: "matchCase",
+    toggleWord: "wholeWord",
+    toggleRegex: "useRegex",
+    toggleDiacritics: "diacritics",
+    toggleHighlightAll: "highlightAll"
+  };
+
   inputEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
+    const combo = comboOf(e);
+    const hit = (action) => settings.keymap[action].includes(combo);
+    // "Binding + Shift" foregrounds the same action (openLinkNewTab).
+    const shiftedHit = (action) =>
+      e.shiftKey && settings.keymap[action].includes(combo.replace(/(^|\+)Shift\+/, "$1"));
+
+    // Open the active match's link in a new tab. Background tabs keep the
+    // bar open, Ctrl+click style, so you can keep harvesting links.
+    if (hit("openLinkNewTab") || shiftedHit("openLinkNewTab")) {
       const link = activeLink();
-      // Ctrl+Enter: open the active match's link in a new tab (Ctrl+Shift+Enter
-      // foregrounds it). Background tabs keep the bar open, Ctrl+click style,
-      // so you can keep walking matches and harvesting links.
-      if (link && (e.ctrlKey || e.metaKey)) {
-        openLinkInNewTab(link, e.shiftKey);
-        if (!e.shiftKey) toast("↗ Opened in a new tab");
+      if (link) {
+        e.preventDefault();
+        const foreground = !hit("openLinkNewTab");
+        openLinkInNewTab(link, foreground);
+        if (!foreground) toast("↗ Opened in a new tab");
         bumpQuickTimer();
         return;
       }
-      if (state.linksOnly && link && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    }
+
+    if (hit("closeBar") || e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      closeBar();
+      return;
+    }
+
+    for (const [action, opt] of Object.entries(TOGGLE_ACTIONS)) {
+      if (hit(action)) {
+        e.preventDefault();
+        toggleOption(opt);
+        bumpQuickTimer();
+        return;
+      }
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const link = activeLink();
+      if (state.linksOnly && link && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // Classic ' quick-find: Enter follows the focused link.
         closeBar();
         link.click();
         return;
       }
       move(e.shiftKey ? -1 : 1);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      closeBar();
-    } else if (e.altKey && !e.ctrlKey && !e.metaKey) {
-      const k = e.key.toLowerCase();
-      const map = { c: "matchCase", w: "wholeWord", r: "useRegex", a: "highlightAll", d: "diacritics" };
-      if (map[k]) {
-        e.preventDefault();
-        toggleOption(map[k]);
-      }
     }
     bumpQuickTimer();
   });
@@ -1041,46 +1120,47 @@
   }
 
   window.addEventListener("keydown", (e) => {
+    if (e.key === "Control" || e.key === "Alt" || e.key === "Shift" || e.key === "Meta") return;
     const target = e.composedPath ? e.composedPath()[0] : e.target;
     const inOurUI = target === inputEl || bar.contains(target);
+    const combo = comboOf(e);
+    const hit = (action) => settings.keymap[action].includes(combo);
 
-    // Ctrl/Cmd+F → replace the native find bar.
-    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "f") {
+    // Open the bar → replaces the native find (default Ctrl+F).
+    if (hit("openBar")) {
       e.preventDefault();
       e.stopPropagation();
       openBar();
       return;
     }
 
-    // F3 / Ctrl+G — find again (classic).
-    if (e.key === "F3" || ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "g")) {
+    // Find again, classic style (default F3 / Ctrl+G, Shift'ed for previous).
+    if (hit("findNext") || hit("findPrev")) {
       if (state.query || inputEl.value) {
         e.preventDefault();
         e.stopPropagation();
         if (!state.open) openBar();
-        move(e.shiftKey ? -1 : 1);
+        move(hit("findPrev") ? -1 : 1);
       }
       return;
     }
 
-    if (state.open && e.key === "Escape" && !inOurUI) {
+    if (state.open && !inOurUI && (hit("closeBar") || e.key === "Escape")) {
       e.preventDefault();
       closeBar();
       return;
     }
 
-    // Firefox type-ahead: / for quick find, ' for links-only quick find.
+    // Firefox type-ahead: quick find, and links-only quick find (default / and ').
     if (
-      settings.quickFind && !state.open &&
-      !e.ctrlKey && !e.metaKey && !e.altKey &&
-      (e.key === "/" || e.key === "'") &&
-      !isEditable(target)
+      settings.quickFind && !state.open && !isEditable(target) &&
+      (hit("quickFind") || hit("quickFindLinks"))
     ) {
       e.preventDefault();
       e.stopPropagation();
       inputEl.value = "";
       state.query = "";
-      openBar({ quick: true, linksOnly: e.key === "'" });
+      openBar({ quick: true, linksOnly: hit("quickFindLinks") });
       return;
     }
 
