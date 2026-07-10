@@ -61,6 +61,8 @@ Clone the repo and load the folder directly via `chrome://extensions` → Develo
 
 ## Keyboard reference
 
+These are the defaults — **every shortcut below is rebindable** in Options → Keyboard shortcuts (each action supports two bindings). `Enter`/`Shift+Enter` navigation is fixed, and `Esc` always closes.
+
 | Keys | Action |
 |---|---|
 | `Ctrl+F` | Open OneSearch (replaces native find) |
