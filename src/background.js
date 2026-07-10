@@ -1,21 +1,17 @@
 "use strict";
 
-// OneSearch background service worker:
-// - relays the keyboard command / toolbar click to the content script
+// OneSearch background (Chrome: service worker, Firefox: event page):
+// - relays the keyboard command to the content script
 // - shows the live match count on the toolbar badge
-
-function toggleInTab(tabId) {
-  chrome.tabs.sendMessage(tabId, { type: "os-toggle" }).catch(() => {
-    // Page where content scripts can't run (chrome://, web store, PDF viewer...)
-  });
-}
+// Toolbar clicks open the popup (src/popup.html), not action.onClicked.
 
 chrome.commands.onCommand.addListener((command, tab) => {
-  if (command === "toggle-search" && tab && tab.id != null) toggleInTab(tab.id);
-});
-
-chrome.action.onClicked.addListener((tab) => {
-  if (tab && tab.id != null) toggleInTab(tab.id);
+  if (command !== "toggle-search" || !tab || tab.id == null) return;
+  chrome.tabs.sendMessage(tab.id, { type: "os-toggle" }, () => {
+    // Swallow "no receiver" on pages where content scripts can't run
+    // (browser pages, extension stores, PDF viewer...).
+    void chrome.runtime.lastError;
+  });
 });
 
 chrome.runtime.onMessage.addListener((msg, sender) => {

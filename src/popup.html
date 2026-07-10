@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OneSearch</title>
+  <style>
+    :root {
+      --bg: #12141c;
+      --panel: #1b1e2a;
+      --border: rgba(255, 255, 255, 0.09);
+      --text: #e8eaf2;
+      --muted: #9aa0b4;
+      --accent: #8b7bf7;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      width: 300px;
+      font-family: -apple-system, "Segoe UI", system-ui, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .banner {
+      display: flex; flex-direction: column; gap: 8px;
+      background: rgba(255, 178, 60, 0.12);
+      border-bottom: 1px solid rgba(255, 178, 60, 0.35);
+      padding: 12px 14px;
+      font-size: 12.5px; line-height: 1.5;
+      color: #ffd9a0;
+    }
+    .banner button {
+      appearance: none; cursor: pointer;
+      background: linear-gradient(135deg, #f59e0b, #f97316);
+      color: #1a1000; font-weight: 700; font-size: 12.5px;
+      border: none; border-radius: 8px; padding: 8px 12px;
+    }
+    .banner button:hover { filter: brightness(1.1); }
+    .banner .small { font-size: 11px; color: rgba(255, 217, 160, 0.7); }
+
+    .granted {
+      background: rgba(126, 242, 154, 0.10);
+      border-bottom: 1px solid rgba(126, 242, 154, 0.35);
+      color: #a8f2bd; padding: 12px 14px;
+      font-size: 12.5px; line-height: 1.5;
+    }
+
+    header {
+      display: flex; align-items: center; gap: 9px;
+      padding: 13px 14px 9px;
+    }
+    header svg { width: 20px; height: 20px; }
+    header .name { font-size: 15px; font-weight: 700; }
+    header .name span {
+      background: linear-gradient(90deg, #818cf8, #e879f9);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+
+    .body { padding: 4px 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+
+    button.row {
+      appearance: none; cursor: pointer; width: 100%;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text); font-size: 13px;
+      padding: 10px 12px; text-align: left;
+      transition: border-color 120ms, background 120ms;
+    }
+    button.row:hover { border-color: var(--accent); background: #20243377; }
+    kbd {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border); border-bottom-width: 2px;
+      border-radius: 5px; padding: 1px 6px;
+      font-size: 11px; font-family: inherit; color: var(--muted);
+      white-space: nowrap;
+    }
+    .err {
+      color: #ff9d9d; font-size: 12px; line-height: 1.45;
+      padding: 2px 2px 0;
+    }
+    footer {
+      display: flex; justify-content: space-between;
+      padding: 8px 14px 12px;
+      color: var(--muted); font-size: 11px;
+    }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="banner" id="banner" hidden>
+    <div><b>One step left!</b> OneSearch needs permission to read pages so it can search in them.</div>
+    <button id="grant">Grant access to all websites</button>
+    <div class="small">Firefox asks this once. You can review it anytime in about:addons → OneSearch → Permissions.</div>
+  </div>
+  <div class="granted" id="granted" hidden>
+    ✓ Access granted! <b>Reload your open tabs</b> once — OneSearch loads automatically everywhere from now on.
+  </div>
+
+  <header>
+    <svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#818cf8"/><stop offset="1" stop-color="#e879f9"/>
+      </linearGradient></defs>
+      <circle cx="10.5" cy="10.5" r="6.5"/><line x1="15.5" y1="15.5" x2="21" y2="21"/>
+    </svg>
+    <div class="name">One<span>Search</span></div>
+  </header>
+
+  <div class="body">
+    <button class="row" id="search">Search in this page <kbd id="openKey">Ctrl+F</kbd></button>
+    <div class="err" id="err" hidden>OneSearch can't run on this page (browser pages, extension stores and PDF viewers are off-limits to extensions).</div>
+    <button class="row" id="options">Options &amp; shortcuts <span>⚙</span></button>
+  </div>
+
+  <footer>
+    <span id="version"></span>
+    <span>GPL-3.0 · Firefox-soul inside</span>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
