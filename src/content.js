@@ -104,7 +104,8 @@
     invalidRegex: false,
     quickTimer: 0,
     searchTimer: 0,
-    mutateTimer: 0
+    mutateTimer: 0,
+    extraDocs: new Set() // same-origin iframe documents seen in the last search
   };
 
   // --------------------------------------------------------------------------
@@ -112,19 +113,51 @@
   // --------------------------------------------------------------------------
 
   const HL_BUCKETS = 5;
-  const buckets = [];
-  for (let i = 0; i < HL_BUCKETS; i++) {
-    const h = new Highlight();
-    h.priority = 1;
-    buckets.push(h);
-    CSS.highlights.set("onesearch-h" + i, h);
-  }
-  const activeHl = new Highlight();
-  activeHl.priority = 100;
-  CSS.highlights.set("onesearch-active", activeHl);
 
-  const pageSheet = new CSSStyleSheet();
-  document.adoptedStyleSheets = [...document.adoptedStyleSheets, pageSheet];
+  // One Highlight registry + adopted stylesheet PER DOCUMENT: matches found
+  // inside same-origin iframes (Dynamics-style apps render content there)
+  // only paint through that frame's own window objects — a Highlight created
+  // in the top window does nothing for ranges living in an iframe document.
+  const docPaint = new Map(); // Document -> { buckets, active, sheet }
+  const adoptedShadowRoots = new WeakSet();
+
+  function paintFor(doc) {
+    let p = docPaint.get(doc);
+    if (p) return p;
+    const win = doc.defaultView;
+    if (!win) return null;
+    try {
+      if (!win.CSS || !("highlights" in win.CSS)) return null;
+      const buckets = [];
+      for (let i = 0; i < HL_BUCKETS; i++) {
+        const h = new win.Highlight();
+        h.priority = 1;
+        buckets.push(h);
+        win.CSS.highlights.set("onesearch-h" + i, h);
+      }
+      const active = new win.Highlight();
+      active.priority = 100;
+      win.CSS.highlights.set("onesearch-active", active);
+      const sheet = new win.CSSStyleSheet();
+      sheet.replaceSync(highlightCSS());
+      doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
+      p = { buckets, active, sheet };
+      docPaint.set(doc, p);
+      return p;
+    } catch {
+      return null; // frame navigating away or wrapper refusal — search still works, unpainted
+    }
+  }
+
+  // ::highlight() styling does not reliably cross shadow boundaries — adopt
+  // our sheet into every open shadow root we search so matches paint there.
+  function adoptIntoShadow(sr, doc) {
+    if (adoptedShadowRoots.has(sr)) return;
+    adoptedShadowRoots.add(sr);
+    const p = paintFor(doc);
+    if (!p) return;
+    try { sr.adoptedStyleSheets = [...sr.adoptedStyleSheets, p.sheet]; } catch { }
+  }
 
   function contrastText(hex) {
     const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
@@ -135,7 +168,7 @@
     return lum > 140 ? "#1a1a1a" : "#ffffff";
   }
 
-  function refreshHighlightStyles() {
+  function highlightCSS() {
     const rules = [];
     for (let i = 0; i < HL_BUCKETS; i++) {
       const c = settings.colors[i % settings.colors.length];
@@ -145,7 +178,16 @@
       `::highlight(onesearch-active){background-color:${settings.activeColor};` +
       `color:${contrastText(settings.activeColor)};text-decoration:underline 2px;}`
     );
-    pageSheet.replaceSync(rules.join("\n"));
+    return rules.join("\n");
+  }
+
+  function refreshHighlightStyles() {
+    paintFor(document);
+    const css = highlightCSS();
+    for (const [doc, p] of docPaint) {
+      if (!doc.defaultView) { docPaint.delete(doc); continue; }
+      try { p.sheet.replaceSync(css); } catch { }
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -277,76 +319,176 @@
   // DOM text collection
   // --------------------------------------------------------------------------
 
-  const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "TITLE", "TEXTAREA", "IFRAME", "OBJECT"]);
+  const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "TITLE", "TEXTAREA", "OBJECT"]);
+
+  // Parent element, crossing shadow boundaries (shadow root -> its host).
+  function parentAcross(el) {
+    if (el.parentElement) return el.parentElement;
+    const root = el.getRootNode ? el.getRootNode() : null;
+    return root && root.host ? root.host : null;
+  }
+
+  // Screen-reader-only text passes checkVisibility() but paints nothing:
+  // the 1px clipped box (.sr-only) and the left:-9999px park-off-screen
+  // patterns. Google's pages are full of both — matching them sends the
+  // spotlight to an empty top-left corner. Memoized per element per search;
+  // only called for elements that actually contain a match, so it's bounded.
+  function isConcealed(el, cache) {
+    if (!el || el.nodeType !== 1) return false;
+    const tag = el.tagName;
+    if (tag === "BODY" || tag === "HTML") return false;
+    let v = cache.get(el);
+    if (v !== undefined) return v;
+    v = false;
+    const win = el.ownerDocument.defaultView;
+    if (win) {
+      const r = el.getBoundingClientRect();
+      if (r.width <= 1 || r.height <= 1) {
+        const cs = win.getComputedStyle(el);
+        if (cs.display !== "contents" &&
+            (cs.overflowX !== "visible" || cs.overflowY !== "visible" ||
+             cs.clipPath !== "none" || cs.clip !== "auto")) {
+          v = true; // collapsed box that clips: nothing inside can paint
+        }
+      }
+      // Off-screen check needs a real box: a 0x0 rect (display:contents,
+      // boxless wrappers) sits at the origin without being "off-screen".
+      if (!v && r.width > 0 && r.height > 0 &&
+          (r.right + win.scrollX <= 0 || r.bottom + win.scrollY <= 0)) {
+        v = true; // parked entirely off-screen
+      }
+    }
+    if (!v) v = isConcealed(parentAcross(el), cache);
+    cache.set(el, v);
+    return v;
+  }
 
   function collectMatches() {
     const matcher = buildMatcher();
     const matches = [];
     state.capped = false;
+    state.extraDocs = new Set();
     if (!matcher) return matches;
 
     const visCache = new Map();
+    const concealCache = new Map();
+    const max = Math.max(1, settings.maxMatches | 0);
+    let capped = false;
+
     const isVisible = (el) => {
       let v = visCache.get(el);
       if (v === undefined) {
         v = typeof el.checkVisibility === "function"
-          ? el.checkVisibility({ visibilityProperty: true, contentVisibilityAuto: true })
+          ? el.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })
           : true;
+        if (!v) {
+          // checkVisibility is false for boxless display:contents elements,
+          // but their children still render — don't prune those subtrees.
+          const win = el.ownerDocument.defaultView;
+          if (win && win.getComputedStyle(el).display === "contents") v = true;
+        }
         visCache.set(el, v);
       }
       return v;
     };
 
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-      acceptNode(node) {
-        const p = node.parentElement;
-        if (!p) return NodeFilter.FILTER_REJECT;
-        if (SKIP_TAGS.has(p.tagName)) return NodeFilter.FILTER_REJECT;
-        if (p === hostEl || hostEl.contains(p)) return NodeFilter.FILTER_REJECT;
-        if (!node.data || !node.data.trim()) return NodeFilter.FILTER_SKIP;
-        if (state.linksOnly && !p.closest("a[href]")) return NodeFilter.FILTER_SKIP;
-        if (!isVisible(p)) return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
-      }
-    });
-
-    const max = Math.max(1, settings.maxMatches | 0);
-    let node;
-    outer: while ((node = walker.nextNode())) {
-      const text = node.data;
-      let haystack, map = null;
-      if (matcher.raw) {
-        haystack = text;
-      } else {
-        const fm = foldedForNode(node);
-        haystack = fm.folded;
-        map = fm.map; // null = identity offsets (ASCII fast path)
-      }
-
-      matcher.re.lastIndex = 0;
-      let m;
-      while ((m = matcher.re.exec(haystack)) !== null) {
-        if (m[0].length === 0) { matcher.re.lastIndex++; continue; }
-        let start, end;
-        if (map) {
-          start = map[m.index];
-          const lastFolded = m.index + m[0].length - 1;
-          const lastOrig = map[lastFolded];
-          end = absorbCombining(text, lastOrig + charLenAt(text, lastOrig));
-        } else {
-          start = m.index;
-          end = m.index + m[0].length;
+    // Recursive walk: descends into open shadow roots and same-origin
+    // iframes/frames — native find searches both, so we must too (Dynamics
+    // CRM renders its whole form area inside iframes).
+    const searchRoot = (rootNode, doc, frames) => {
+      if (capped) return;
+      const walker = doc.createTreeWalker(rootNode, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+          if (node.nodeType === 1) {
+            if (SKIP_TAGS.has(node.tagName)) return NodeFilter.FILTER_REJECT;
+            if (node === hostEl) return NodeFilter.FILTER_REJECT;
+            if (!isVisible(node)) return NodeFilter.FILTER_REJECT;
+            if (node.shadowRoot || node.tagName === "IFRAME" || node.tagName === "FRAME") {
+              return NodeFilter.FILTER_ACCEPT; // surfaced to the loop for recursion
+            }
+            return NodeFilter.FILTER_SKIP;
+          }
+          if (!node.data || !node.data.trim()) return NodeFilter.FILTER_SKIP;
+          if (state.linksOnly && !(node.parentElement && node.parentElement.closest("a[href]"))) {
+            return NodeFilter.FILTER_SKIP;
+          }
+          return NodeFilter.FILTER_ACCEPT;
         }
-        try {
-          const range = new Range();
-          range.setStart(node, start);
-          range.setEnd(node, end);
-          matches.push({ range, node, start, end });
-        } catch { /* offsets raced a DOM mutation; skip */ }
-        if (matches.length >= max) { state.capped = true; break outer; }
+      });
+
+      let node;
+      while (!capped && (node = walker.nextNode())) {
+        if (node.nodeType === 1) {
+          if (node.shadowRoot) {
+            adoptIntoShadow(node.shadowRoot, doc);
+            searchRoot(node.shadowRoot, doc, frames);
+          } else {
+            let idoc = null;
+            try { idoc = node.contentDocument; } catch { /* cross-origin */ }
+            if (idoc && idoc.body) {
+              state.extraDocs.add(idoc);
+              searchRoot(idoc.body, idoc, frames.concat(node));
+            }
+          }
+          continue;
+        }
+
+        const text = node.data;
+        let haystack, map = null;
+        if (matcher.raw) {
+          haystack = text;
+        } else {
+          const fm = foldedForNode(node);
+          haystack = fm.folded;
+          map = fm.map; // null = identity offsets (ASCII fast path)
+        }
+
+        matcher.re.lastIndex = 0;
+        let m;
+        let parentChecked = false;
+        while ((m = matcher.re.exec(haystack)) !== null) {
+          if (m[0].length === 0) { matcher.re.lastIndex++; continue; }
+          if (!parentChecked) {
+            parentChecked = true;
+            if (isConcealed(node.parentElement, concealCache)) break;
+          }
+          let start, end;
+          if (map) {
+            start = map[m.index];
+            const lastFolded = m.index + m[0].length - 1;
+            const lastOrig = map[lastFolded];
+            end = absorbCombining(text, lastOrig + charLenAt(text, lastOrig));
+          } else {
+            start = m.index;
+            end = m.index + m[0].length;
+          }
+          try {
+            const range = doc.createRange();
+            range.setStart(node, start);
+            range.setEnd(node, end);
+            matches.push({ range, node, start, end, doc, frames });
+          } catch { /* offsets raced a DOM mutation; skip */ }
+          if (matches.length >= max) { state.capped = true; capped = true; break; }
+        }
       }
-    }
+    };
+
+    if (document.body) searchRoot(document.body, document, []);
     return matches;
+  }
+
+  // Rect of a match in TOP-window viewport coordinates, accumulating offsets
+  // up through any same-origin iframes it lives in.
+  function viewportRect(m) {
+    const r = m.range.getBoundingClientRect();
+    let left = r.left, top = r.top;
+    for (let i = m.frames.length - 1; i >= 0; i--) {
+      const f = m.frames[i];
+      const fr = f.getBoundingClientRect();
+      left += fr.left + f.clientLeft;
+      top += fr.top + f.clientTop;
+    }
+    return { left, top, width: r.width, height: r.height, right: left + r.width, bottom: top + r.height };
   }
 
   // --------------------------------------------------------------------------
@@ -587,8 +729,19 @@
   // --------------------------------------------------------------------------
 
   function clearHighlights() {
-    for (const b of buckets) b.clear();
-    activeHl.clear();
+    for (const [doc, p] of docPaint) {
+      if (!doc.defaultView) { docPaint.delete(doc); continue; }
+      try {
+        for (const b of p.buckets) b.clear();
+        p.active.clear();
+      } catch { }
+    }
+  }
+
+  function clearActive() {
+    for (const [, p] of docPaint) {
+      try { p.active.clear(); } catch { }
+    }
   }
 
   function runSearch({ keepActive = false } = {}) {
@@ -599,7 +752,8 @@
 
     if (state.highlightAllOn) {
       state.matches.forEach((m, i) => {
-        buckets[settings.rainbow ? i % HL_BUCKETS : 0].add(m.range);
+        const p = paintFor(m.doc);
+        if (p) p.buckets[settings.rainbow ? i % HL_BUCKETS : 0].add(m.range);
       });
     }
 
@@ -615,6 +769,7 @@
     setActive(nextActive, { scroll: !prev });
     scheduleMinimap();
     updateBarState();
+    if (state.open) startObserver(); // re-arm to cover iframe docs found this pass
   }
 
   function scheduleSearch() {
@@ -625,7 +780,7 @@
   function firstIndexInView() {
     const n = state.matches.length;
     if (n === 0) return 0;
-    const rectOf = (i) => state.matches[i].range.getBoundingClientRect();
+    const rectOf = (i) => viewportRect(state.matches[i]);
 
     if (n <= 300) {
       // Small result sets: exact linear scan.
@@ -653,7 +808,7 @@
   }
 
   function setActive(index, { scroll = true } = {}) {
-    activeHl.clear();
+    clearActive();
     state.active = index;
     if (index < 0 || index >= state.matches.length) {
       updateCount();
@@ -661,7 +816,8 @@
       return;
     }
     const m = state.matches[index];
-    activeHl.add(m.range);
+    const p = paintFor(m.doc);
+    if (p) p.active.add(m.range);
     if (scroll) scrollToMatch(m);
     updateCount();
     updateBadge();
@@ -691,7 +847,7 @@
         inline: "nearest"
       });
     }
-    spotlight(m.range);
+    spotlight(m);
   }
 
   function updateCount() {
@@ -734,7 +890,7 @@
 
   let spotAnim = 0;
 
-  function spotlight(range) {
+  function spotlight(match) {
     if (!settings.spotlight) return;
     cancelAnimationFrame(spotAnim);
     spotlayer.textContent = "";
@@ -768,7 +924,7 @@
     const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
     const frame = (now) => {
-      const rect = range.getBoundingClientRect();
+      const rect = viewportRect(match); // top-window coords, even inside iframes
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
       const base = Math.max(rect.width, rect.height, 30) + 26;
@@ -867,7 +1023,7 @@
 
     for (let i = 0; i < n; i += stride) {
       const m = state.matches[i];
-      const rect = m.range.getBoundingClientRect();
+      const rect = viewportRect(m);
       if (rect.width === 0 && rect.height === 0) continue;
       const y = ((rect.top + window.scrollY) / docH) * 100;
       const tick = document.createElement("div");
@@ -1122,7 +1278,9 @@
   window.addEventListener("keydown", (e) => {
     if (e.key === "Control" || e.key === "Alt" || e.key === "Shift" || e.key === "Meta") return;
     const target = e.composedPath ? e.composedPath()[0] : e.target;
-    const inOurUI = target === inputEl || bar.contains(target);
+    // Synthetic events dispatched on window have a non-Node target.
+    const targetIsNode = !!target && typeof target.nodeType === "number";
+    const inOurUI = targetIsNode && (target === inputEl || bar.contains(target));
     const combo = comboOf(e);
     const hit = (action) => settings.keymap[action].includes(combo);
 
@@ -1135,13 +1293,13 @@
     }
 
     // Find again, classic style (default F3 / Ctrl+G, Shift'ed for previous).
+    // Always consumed — falling through here is how the NATIVE find bar used
+    // to sneak open on a first F3 with no previous query.
     if (hit("findNext") || hit("findPrev")) {
-      if (state.query || inputEl.value) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!state.open) openBar();
-        move(hit("findPrev") ? -1 : 1);
-      }
+      e.preventDefault();
+      e.stopPropagation();
+      if (!state.open) openBar();
+      if (state.query || inputEl.value) move(hit("findPrev") ? -1 : 1);
       return;
     }
 
@@ -1195,9 +1353,14 @@
     state.mutateTimer = setTimeout(() => runSearch({ keepActive: true }), 350);
   });
 
+  const OBSERVE_OPTS = { childList: true, subtree: true, characterData: true };
+
   function startObserver() {
-    if (document.body) {
-      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    observer.disconnect();
+    if (document.body) observer.observe(document.body, OBSERVE_OPTS);
+    // Also watch the same-origin iframe documents the last search visited.
+    for (const doc of state.extraDocs) {
+      try { if (doc.body) observer.observe(doc.body, OBSERVE_OPTS); } catch { }
     }
   }
   function stopObserver() {
