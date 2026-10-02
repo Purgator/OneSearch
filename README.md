@@ -45,12 +45,12 @@ OneSearch isn't on the extension stores (yet), but installing it by hand takes a
 
 ### Chrome / Edge / Brave
 
-1. **Download it** — go to the [latest release](https://github.com/Purgator/OneSearch/releases/latest) and click the **`OneSearch-v*.zip`** file under *Assets*.
-2. **Unzip it** — find the downloaded file (usually in your *Downloads* folder), right-click it and choose **Extract All…** (Windows) or double-click it (Mac). You now have a folder called `OneSearch`.
+1. **Download it** — go to the [latest release](https://github.com/Purgator/OneSearch/releases/latest) and click **`OneSearch-chrome.zip`** under *Assets*.
+2. **Unzip it** — find the downloaded file (usually in your *Downloads* folder), right-click it and choose **Extract All…** (Windows) or double-click it (Mac). You now have a folder called `OneSearch-chrome`.
    > ⚠️ Move that folder somewhere permanent (like your Documents) — Chrome loads the extension *from* this folder, so don't delete it afterwards.
 3. **Open Chrome's extensions page** — type `chrome://extensions` in the address bar and press Enter.
 4. **Turn on Developer mode** — it's a small switch in the top-right corner of that page.
-5. **Load the extension** — click the **Load unpacked** button (top-left), and select the `OneSearch` folder you extracted (the one containing `manifest.json`).
+5. **Load the extension** — click the **Load unpacked** button (top-left), and select the `OneSearch-chrome` folder you extracted (the one containing `manifest.json`).
 6. **Done!** Open any web page and press **Ctrl+F**. Enjoy the rainbow. 🌈
 
 To change colors and options later: right-click the OneSearch icon in the toolbar → **Options** (or click the ⚙ in the search bar itself).
@@ -59,10 +59,10 @@ To change colors and options later: right-click the OneSearch icon in the toolba
 
 ### Firefox
 
-Requires Firefox 132 or newer. Download and unzip the release as above, then:
+Requires Firefox 132 or newer. Firefox has its own download: grab **`OneSearch-firefox.zip`** from the [latest release](https://github.com/Purgator/OneSearch/releases/latest) (no need to unzip it), then:
 
 1. Type `about:debugging#/runtime/this-firefox` in the address bar
-2. Click **Load Temporary Add-on…** and select the **`manifest.json`** file inside the `OneSearch` folder
+2. Click **Load Temporary Add-on…** and select **`OneSearch-firefox.zip`**
 3. **Grant site access** — this is the step everyone misses: Firefox doesn't let extensions read pages until you say so. Click the OneSearch icon in the toolbar and press **"Grant access to all websites"** in the orange banner. (Alternative: `about:addons` → OneSearch → *Permissions* tab → enable *Access your data for all websites*.)
 4. Reload your open tabs once, then press **Ctrl+F** on any page
 
@@ -71,6 +71,8 @@ Requires Firefox 132 or newer. Download and unzip the release as above, then:
 ### Developer install
 
 Clone the repo and load the folder directly: `chrome://extensions` → Developer mode → **Load unpacked** (Chrome), or `about:debugging` → **Load Temporary Add-on** (Firefox).
+
+To build the release ZIPs, run `node scripts/build.js`. Produces `dist/OneSearch-chrome.zip` and `dist/OneSearch-firefox.zip` (no dependencies, Node 22+). The source `manifest.json` carries both browsers' keys so the repo folder loads unpacked anywhere; each ZIP keeps only the keys its browser needs.
 
 ## Keyboard reference
 
