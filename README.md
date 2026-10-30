@@ -109,5 +109,5 @@ tools/make-icons.ps1 Icon generator (PowerShell / System.Drawing)
 
 ## License
 
-OneSearch is free software, released under the [GNU General Public License v3.0](LICENSE) (or any later version). You are free to use, study, modify and share it — derivative works must remain free under the same terms.
+OneSearch is free software, released under the [GNU General Public License v3.0 or later](LICENSE) (`GPL-3.0-or-later`). You are free to use, study, modify and share it — derivative works must remain free under the same terms.
 - Highlights are pure paint (Custom Highlight API): copy/paste, selection and page scripts are completely unaffected.
