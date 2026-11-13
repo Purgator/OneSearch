@@ -4,11 +4,18 @@ A Chrome extension that replaces the default **Ctrl+F** with the find bar you al
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue) ![No page mutation](https://img.shields.io/badge/DOM-untouched-green)
 
+![The OneSearch find bar on an article: every match of "cafe" highlighted in rainbow colors, a 5 / 35 counter, and colored ticks along the scrollbar](docs/find-bar.png)
+
 ## Why
 
 Chrome's find bar hasn't changed in 15 years. Firefox in the good old days had *Highlight All*, type-ahead find with `/`, links-only quick find with `'`, the pink "phrase not found" flash, and F3 find-again. OneSearch brings all of that back — and goes further.
 
 ## Features
+
+| | |
+|---|---|
+| ![Red spotlight rings closing in on the active match](docs/spotlight.png) | ![Quick find in links only: the bar shows QUICK and LINKS tags and only link text is highlighted](docs/quick-find-links.png) |
+| Spotlight rings sweep in from the edges of the screen and land on the match you jumped to. | Press `'` to search link text only, then Enter to follow the link. |
 
 ### Search engine
 - **Search as you type** — instant, debounced, zero flicker
@@ -38,6 +45,11 @@ Chrome's find bar hasn't changed in 15 years. Firefox in the good old days had *
 - Draggable, glassmorphic bar that stays out of your way
 - Remembers your last search, pre-selected on reopen
 - Everything configurable in a polished options page; settings sync across your Chrome profiles
+
+| | |
+|---|---|
+| ![The options page: rainbow palette, active match color and a live highlight preview](docs/options.png) | ![The toolbar popup with its two buttons, Search in this page and Options & shortcuts](docs/popup.png) |
+| The options page: pick your colors and see them live. | The toolbar popup. |
 
 ## How to install (no technical skills needed)
 
